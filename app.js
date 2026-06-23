@@ -1,11 +1,8 @@
 const API_URL =
 "https://galeria-multimedia-backend-g60l.onrender.com";
 
-const form =
-document.getElementById("formMultimedia");
-
-const galeria =
-document.getElementById("galeria");
+const form = document.getElementById("formMultimedia");
+const galeria = document.getElementById("galeria");
 
 let modoEdicion = false;
 let idEditar = null;
@@ -14,18 +11,39 @@ async function cargarMultimedia() {
 
     try {
 
-        const res =
-        await fetch(`${API_URL}/multimedia`);
+        galeria.innerHTML = `
+        <div class="col-span-full text-center text-white text-xl">
+            Cargando...
+        </div>
+        `;
 
-        const datos =
-        await res.json();
+        const res = await fetch(
+            `${API_URL}/multimedia?t=${Date.now()}`
+        );
+
+        const datos = await res.json();
 
         galeria.innerHTML = "";
 
+        if (datos.length === 0) {
+
+            galeria.innerHTML = `
+            <div class="col-span-full bg-white p-6 rounded-xl text-center">
+                No hay elementos registrados
+            </div>
+            `;
+
+            return;
+        }
+
         datos.forEach(item => {
 
-            galeria.innerHTML += `
-            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+            const tarjeta = document.createElement("div");
+
+            tarjeta.className =
+            "bg-white rounded-2xl shadow-xl overflow-hidden";
+
+            tarjeta.innerHTML = `
 
                 ${
                     item.imagenUrl
@@ -54,8 +72,7 @@ async function cargarMultimedia() {
                         ?
                         `
                         <audio controls class="w-full mb-4">
-                            <source
-                            src="${API_URL}${item.audioUrl}">
+                            <source src="${API_URL}${item.audioUrl}">
                         </audio>
                         `
                         :
@@ -65,36 +82,53 @@ async function cargarMultimedia() {
                     <div class="flex gap-2">
 
                         <button
-                        onclick="editarElemento(
-                        '${item._id}',
-                        '${item.titulo}',
-                        \`${item.descripcion || ''}\`
-                        )"
-                        class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded">
-
+                        class="editarBtn flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded">
                         Editar
-
                         </button>
 
                         <button
-                        onclick="eliminarElemento('${item._id}')"
-                        class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded">
-
+                        class="eliminarBtn flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded">
                         Eliminar
-
                         </button>
 
                     </div>
 
                 </div>
-
-            </div>
             `;
+
+            tarjeta
+            .querySelector(".editarBtn")
+            .addEventListener("click", () => {
+
+                editarElemento(
+                    item._id,
+                    item.titulo,
+                    item.descripcion || ''
+                );
+
+            });
+
+            tarjeta
+            .querySelector(".eliminarBtn")
+            .addEventListener("click", () => {
+
+                eliminarElemento(item._id);
+
+            });
+
+            galeria.appendChild(tarjeta);
+
         });
 
-    } catch(error) {
+    } catch (error) {
 
         console.error(error);
+
+        galeria.innerHTML = `
+        <div class="col-span-full bg-red-100 text-red-600 p-5 rounded">
+            Error al cargar elementos
+        </div>
+        `;
     }
 }
 
@@ -104,16 +138,16 @@ form.addEventListener("submit", async (e) => {
 
     try {
 
-        if(modoEdicion){
+        if (modoEdicion) {
 
             const res = await fetch(
                 `${API_URL}/multimedia/${idEditar}`,
                 {
-                    method:'PUT',
-                    headers:{
-                        'Content-Type':'application/json'
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
                     },
-                    body:JSON.stringify({
+                    body: JSON.stringify({
                         titulo:
                         document.getElementById("titulo").value,
 
@@ -123,17 +157,32 @@ form.addEventListener("submit", async (e) => {
                 }
             );
 
-            if(res.ok){
+            if (!res.ok) {
 
-                alert("Elemento actualizado");
+                const error = await res.text();
 
-                modoEdicion = false;
-                idEditar = null;
+                console.log(error);
 
-                form.reset();
+                alert("Error al actualizar");
 
-                cargarMultimedia();
+                return;
             }
+
+            await res.json();
+
+            alert("Elemento actualizado");
+
+            modoEdicion = false;
+            idEditar = null;
+
+            form.reset();
+
+            document.querySelector(
+                'button[type="submit"]'
+            ).textContent =
+            "Guardar Elemento";
+
+            await cargarMultimedia();
 
             return;
         }
@@ -156,43 +205,48 @@ form.addEventListener("submit", async (e) => {
         const audio =
         document.getElementById("audio").files[0];
 
-        if(imagen){
+        if (imagen) {
             formData.append("imagen", imagen);
         }
 
-        if(audio){
+        if (audio) {
             formData.append("audio", audio);
         }
 
         const res = await fetch(
             `${API_URL}/multimedia`,
             {
-                method:'POST',
-                body:formData
+                method: "POST",
+                body: formData
             }
         );
 
-        if(res.ok){
+        if (!res.ok) {
 
-            alert("Elemento guardado");
+            alert("Error al guardar");
 
-            form.reset();
-
-            cargarMultimedia();
+            return;
         }
 
-    } catch(error){
+        alert("Elemento guardado");
+
+        form.reset();
+
+        await cargarMultimedia();
+
+    } catch (error) {
 
         console.error(error);
-    }
 
+        alert("Error de conexión");
+    }
 });
 
 function editarElemento(
     id,
     titulo,
     descripcion
-){
+) {
 
     modoEdicion = true;
 
@@ -204,36 +258,45 @@ function editarElemento(
     document.getElementById("descripcion").value =
     descripcion;
 
+    document.querySelector(
+        'button[type="submit"]'
+    ).textContent =
+    "Actualizar Elemento";
+
     window.scrollTo({
-        top:0,
-        behavior:'smooth'
+        top: 0,
+        behavior: "smooth"
     });
 }
 
-async function eliminarElemento(id){
+async function eliminarElemento(id) {
 
     const confirmar =
     confirm("¿Deseas eliminar este elemento?");
 
-    if(!confirmar) return;
+    if (!confirmar) return;
 
     try {
 
         const res = await fetch(
             `${API_URL}/multimedia/${id}`,
             {
-                method:'DELETE'
+                method: "DELETE"
             }
         );
 
-        if(res.ok){
+        if (!res.ok) {
 
-            alert("Elemento eliminado");
+            alert("Error al eliminar");
 
-            cargarMultimedia();
+            return;
         }
 
-    } catch(error){
+        alert("Elemento eliminado");
+
+        await cargarMultimedia();
+
+    } catch (error) {
 
         console.error(error);
     }
